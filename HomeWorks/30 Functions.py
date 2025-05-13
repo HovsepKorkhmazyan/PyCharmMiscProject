@@ -68,7 +68,7 @@ def closest_palindrome(num):
 def product_of_first_and_last_digit(num):
     str_num = str(num)
     if len(str_num) < 2:
-        return int(str_num) ** 2  # If single digit, return square
+        return int(str_num) ** 2
     first_digit = int(str_num[0])
     last_digit = int(str_num[-1])
     return first_digit * last_digit
