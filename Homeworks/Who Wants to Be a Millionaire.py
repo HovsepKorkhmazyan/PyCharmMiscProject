@@ -1,4 +1,5 @@
 import random
+import os
 
 
 def read_questions_from_file(filename):
@@ -59,11 +60,52 @@ def quiz(questions):
             score += 1
 
     print(f"Your final score is: {score}/{len(questions)}")
+    return score
 
 
-filename = "questions"
-questions = read_questions_from_file(filename)
-if questions:
-    quiz(questions)
-else:
-    print("No valid questions found in the file.")
+def add_question_to_file(filename):
+    question = input("Enter the question: ")
+    answers = []
+    for i in range(4):
+        answer = input(f"Enter answer {i + 1}: ")
+        answers.append(answer)
+    with open(filename, 'a', encoding='utf-8') as f:
+        f.write(f"{question}\n" + "\n".join(answers) + "\n\n")
+    print("Question added successfully!")
+
+
+#Main Logic
+    filename = "questions"
+    scores = {}
+
+    while True:
+        username = input("Enter your username: ")
+        if username in scores:
+            print("Username already exists. Please try again.")
+        else:
+            scores[username] = 0
+            break
+
+    while True:
+        choice = input("Do you want to play(p)  or add(a) a question? (q to quit): ").lower()
+        if choice == 'p':
+            questions = read_questions_from_file(filename)
+            if questions:
+                score = quiz(questions)
+                scores[username] += score
+                print(f"{username}'s total score: {scores[username]}")
+            else:
+                print("No valid questions found in the file.")
+        elif choice == 'a':
+            add_question_to_file(filename)
+        elif choice == 'q':
+            break
+        else:
+            print("Invalid choice. Please select 'p', 'a', or 'q'.")
+
+
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    print("\nScores:")
+    for user, score in sorted_scores:
+        print(f"{user}: {score}")
+
