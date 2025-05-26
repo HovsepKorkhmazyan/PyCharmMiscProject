@@ -74,38 +74,36 @@ def add_question_to_file(filename):
     print("Question added successfully!")
 
 
-#Main Logic
-    filename = "questions"
-    scores = {}
+# Main Logic
+filename = "questions"
+scores = {}
 
-    while True:
-        username = input("Enter your username: ")
-        if username in scores:
-            print("Username already exists. Please try again.")
+while True:
+    username = input("Enter your username: ")
+    if username in scores:
+        print("Username already exists. Please try again.")
+    else:
+        scores[username] = 0
+        break
+
+while True:
+    choice = input("Do you want to play (p) or add (a) a question? (q to quit): ").lower()
+    if choice == 'p':
+        questions = read_questions_from_file(filename)
+        if questions:
+            score = quiz(questions)
+            scores[username] += score
+            print(f"{username}'s total score: {scores[username]}")
         else:
-            scores[username] = 0
-            break
+            print("No valid questions found in the file.")
+    elif choice == 'a':
+        add_question_to_file(filename)
+    elif choice == 'q':
+        break
+    else:
+        print("Invalid choice. Please select 'p', 'a', or 'q'.")
 
-    while True:
-        choice = input("Do you want to play(p)  or add(a) a question? (q to quit): ").lower()
-        if choice == 'p':
-            questions = read_questions_from_file(filename)
-            if questions:
-                score = quiz(questions)
-                scores[username] += score
-                print(f"{username}'s total score: {scores[username]}")
-            else:
-                print("No valid questions found in the file.")
-        elif choice == 'a':
-            add_question_to_file(filename)
-        elif choice == 'q':
-            break
-        else:
-            print("Invalid choice. Please select 'p', 'a', or 'q'.")
-
-
-    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    print("\nScores:")
-    for user, score in sorted_scores:
-        print(f"{user}: {score}")
-
+sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+print("\nScores:")
+for user, score in sorted_scores:
+    print(f"{user}: {score}")
