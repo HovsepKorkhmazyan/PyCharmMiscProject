@@ -43,7 +43,7 @@ def check_winner(board):
     return "No winner"
 
 
-filename = "board.txt"
+filename = "../Homeworks/board.txt"
 board = read_board(filename)
 result = check_winner(board)
 print()
