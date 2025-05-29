@@ -21,3 +21,11 @@ xoo
 xoo
 oxo
 oxx
+
+xoo
+oxo
+ooo
+
+oox
+oxo
+xoo

@@ -26,9 +26,9 @@ def check_winner(board):
             return f"{board[0][col]} wins vertically"
     # Check diagonal wins
     if board[0][0] == board[1][1] == board[2][2] and board[0][0] in ('X', 'O', 'x', 'o'):
-        return f"{board[0][0]} wins diagonally (top-left to bottom-right)"
+        return f"{board[0][0]} wins diagonally"
     if board[0][2] == board[1][1] == board[2][0] and board[0][2] in ('X', 'O', 'x', 'o'):
-        return f"{board[0][2]} wins diagonally (top-right to bottom-left)"
+        return f"{board[0][2]} wins diagonally"
     return "No winner"
 
 def main():
