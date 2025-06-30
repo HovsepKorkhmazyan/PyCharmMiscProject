@@ -1,4 +1,4 @@
-born Ծնվել
-island կղզի
-family ընտանիք
-origin Ծակմամբ
+121
+apple
+good
+12
