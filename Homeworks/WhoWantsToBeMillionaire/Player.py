@@ -7,7 +7,6 @@ class Player:
         self.scores = {}
 
     def prompt_user_choice(self):
-
         while True:
             choice = input("Do you want to play (p) or add (a) a question? (q to quit): ").lower()
             if choice in ['p', 'a', 'q']:
@@ -15,16 +14,15 @@ class Player:
             print("Invalid choice. Please select 'p', 'a', or 'q'.")
 
     def get_unique_username(self):
-
         while True:
             username = input("Enter your username: ")
             if username in self.scores:
                 print("Username already exists. Please try again.")
             else:
+                self.scores[username] = 0
                 return username
 
     def ask_question(self, question, answers):
-
         question_text, answer_options = question, answers
         correct_answer = answer_options[0]
         wrong_answers = answer_options[1:]
@@ -44,20 +42,24 @@ class Player:
         return False
 
     def _get_user_answer(self, num_options):
-
         while True:
-            answer = input("Please select the correct answer (1-{}): ".format(num_options))
+            answer = input(f"Please select the correct answer (1-{num_options}): ")
             if answer.isdigit() and 1 <= int(answer) <= num_options:
                 return int(answer)
-            print("Invalid input. Please enter a number between 1 and", num_options)
+            print(f"Invalid input. Please enter a number between 1 and {num_options}.")
 
     def display_score(self):
-
         print(f"{self.username}'s score: {self.score}")
 
     def display_all_scores(self):
-
         print("\nLeaderboard:")
         sorted_scores = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)
         for rank, (user, score) in enumerate(sorted_scores, 1):
             print(f"{rank}. {user}: {score}")
+
+    def save_scores_to_file(self, filename="leaderboard.txt"):
+        with open(filename, 'w', encoding='utf-8') as f:
+            sorted_scores = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)
+            for rank, (user, score) in enumerate(sorted_scores, 1):
+                f.write(f"{rank}. {user}: {score}\n")
+        print(f"Leaderboard saved to {filename} successfully!")

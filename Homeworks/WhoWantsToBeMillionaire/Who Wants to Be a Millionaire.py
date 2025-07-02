@@ -1,12 +1,9 @@
-from QuestionsClass import Questions
-from PlayerClass import Player
-
+from Questions import Questions
+from Player import Player
 
 def main():
-
     quiz = Questions("questions")
     player = Player("")
-
 
     username = player.get_unique_username()
     player.username = username
@@ -31,7 +28,7 @@ def main():
             break
 
     player.display_all_scores()
-
+    player.save_scores_to_file()
 
 if __name__ == "__main__":
     main()

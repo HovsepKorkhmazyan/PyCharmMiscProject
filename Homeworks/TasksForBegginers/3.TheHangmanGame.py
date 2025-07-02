@@ -1,11 +1,17 @@
-import random
-import argparse
+try:
+    import random
+    import argparse
+except ImportError as e:
+    print(f"Import error: {e}")
 
 
-def hangman(max_attempts, show_art):
+
+def select_word():
     words = ['python', 'hangman', 'programming', 'computer', 'keyboard',
              'developer', 'algorithm', 'function', 'variable', 'dictionary']
+    return random.choice(words).lower()
 
+def display_hangman(incorrect_guesses, show_art):
     hangman_art = [
         """
           +---+
@@ -71,8 +77,31 @@ def hangman(max_attempts, show_art):
         =========
         """
     ]
+    if show_art:
+        print(hangman_art[min(incorrect_guesses, len(hangman_art) - 1)])
 
-    secret_word = random.choice(words).lower()
+def process_guess(guess, secret_word, guessed_letters, word_progress):
+    if guess in secret_word:
+        print(f"Correct! '{guess}' is in the word.")
+        for i, letter in enumerate(secret_word):
+            if letter == guess:
+                word_progress[i] = guess
+    else:
+        print(f"Sorry, '{guess}' is not in the word.")
+        return False
+    return True
+
+def check_game_status(word_progress, incorrect_guesses, max_attempts, secret_word):
+    if '_' not in word_progress:
+        print("\nCongratulations! You guessed the word:", secret_word)
+        return True
+    if incorrect_guesses >= max_attempts:
+        print("\nGame over! The word was:", secret_word)
+        return True
+    return False
+
+def hangman(max_attempts, show_art):
+    secret_word = select_word()
     guessed_letters = set()
     incorrect_guesses = 0
     word_progress = ['_'] * len(secret_word)
@@ -94,32 +123,16 @@ def hangman(max_attempts, show_art):
 
         guessed_letters.add(guess)
 
-        if guess in secret_word:
-            print(f"Correct! '{guess}' is in the word.")
-            for i, letter in enumerate(secret_word):
-                if letter == guess:
-                    word_progress[i] = guess
-        else:
+        if not process_guess(guess, secret_word, guessed_letters, word_progress):
             incorrect_guesses += 1
-            print(f"Sorry, '{guess}' is not in the word.")
-            if show_art:
-                print(hangman_art[min(incorrect_guesses, len(hangman_art) - 1)])
+            display_hangman(incorrect_guesses, show_art)
             print(f"You have {max_attempts - incorrect_guesses} attempts left.")
 
         print("\nWord: ", ' '.join(word_progress))
         print("Guessed letters: ", sorted(guessed_letters))
 
-        if '_' not in word_progress:
-            print("\nCongratulations! You guessed the word:", secret_word)
+        if check_game_status(word_progress, incorrect_guesses, max_attempts, secret_word):
             break
-
-        if incorrect_guesses >= max_attempts:
-            print("\nGame over!")
-            if show_art:
-                print(hangman_art[-1])
-            print("The word was:", secret_word)
-            break
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Play Hangman Game")
