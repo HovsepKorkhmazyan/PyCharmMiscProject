@@ -1,0 +1,2 @@
+Paris
+Temperature: 22C, Humidity: 60%, Cloudiness: 50%
