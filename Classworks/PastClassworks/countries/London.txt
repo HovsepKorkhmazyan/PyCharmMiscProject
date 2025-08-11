@@ -1,2 +1,0 @@
-London
-Temperature: 20C, Humidity: 75%, Cloudiness: 60%

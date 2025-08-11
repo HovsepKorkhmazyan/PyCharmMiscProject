@@ -1,6 +1,0 @@
-Number Counts:
-10: 2
-
-Word Counts:
-apple: 2
-good: 1

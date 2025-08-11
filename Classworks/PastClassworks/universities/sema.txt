@@ -1,4 +1,0 @@
-Name : SEMA
-Year : 1935
-Location : Yerevan
-Students : 10260

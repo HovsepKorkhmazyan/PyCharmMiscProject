@@ -1,2 +1,0 @@
-Yerevan
-Temperature: 28C, Humidity: 45%, Cloudiness: 30%

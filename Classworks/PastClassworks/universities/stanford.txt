@@ -1,4 +1,0 @@
-Name : Stanford
-Year : 1885
-Location : Stanford
-Students : 94305

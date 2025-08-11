@@ -1,4 +1,0 @@
-Name : Harvard
-Year : 1636
-Location : Cambridge
-Students : 02138

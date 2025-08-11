@@ -1,2 +1,0 @@
-Moscow
-Temperature: 18C, Humidity: 55%, Cloudiness: 45%
