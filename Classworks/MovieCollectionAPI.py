@@ -118,7 +118,7 @@ def bulk_add_movies(movies: List[MovieCreate]):
     added = []
     for movie in movies:
         movie_id = get_next_id()
-        movie_obj = Movie(id=movie_id, **movie.dict())
+        movie_obj = Movie(id=movie_id, **movie.model_dump())
         movies_db[movie_id] = movie_obj
         added.append(movie_obj)
     return added
