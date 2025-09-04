@@ -46,7 +46,7 @@ def get_next_id():
 @app.post("/movies/", response_model=Movie, status_code=201)
 def add_movie(movie: MovieCreate):
     movie_id = get_next_id()
-    movie_obj = Movie(id=movie_id, **movie.dict())
+    movie_obj = Movie(id=movie_id, **movie.model_dump())
     movies_db[movie_id] = movie_obj
     return movie_obj
 
@@ -89,7 +89,7 @@ def update_movie(movie_id: int, movie_update: MovieUpdate):
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
     update_data = movie_update.dict(exclude_unset=True)
-    updated = movie.copy(update=update_data)
+    updated = movie.model_copy(update=update_data)
     movies_db[movie_id] = updated
     return updated
 
