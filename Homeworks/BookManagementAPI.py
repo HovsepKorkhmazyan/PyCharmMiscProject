@@ -4,11 +4,7 @@ from typing import List, Optional, Dict, Any
 from collections import Counter
 import uvicorn
 
-app = FastAPI(
-    title="Movie Collection API 🎬",
-    description="A comprehensive API for managing a movie collection, built with FastAPI.",
-    version="1.0.0",
-)
+app = FastAPI()
 
 db_movies = [
     {"id": 1, "title": "The Shawshank Redemption", "genre": "Drama", "year": 1994, "rating": 9.3},
