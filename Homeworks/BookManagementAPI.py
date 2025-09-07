@@ -1,165 +1,193 @@
-from datetime import datetime
-from typing import List, Optional
-from enum import Enum
-
-from fastapi import FastAPI, Query, Body, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, Query, Body, Path
 from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+from collections import Counter
+import uvicorn
 
-app = FastAPI()
+app = FastAPI(
+    title="Movie Collection API 🎬",
+    description="A comprehensive API for managing a movie collection, built with FastAPI.",
+    version="1.0.0",
+)
 
+db_movies = [
+    {"id": 1, "title": "The Shawshank Redemption", "genre": "Drama", "year": 1994, "rating": 9.3},
+    {"id": 2, "title": "The Godfather", "genre": "Crime", "year": 1972, "rating": 9.2},
+    {"id": 3, "title": "The Dark Knight", "genre": "Action", "year": 2008, "rating": 9.0},
+    {"id": 4, "title": "Pulp Fiction", "genre": "Crime", "year": 1994, "rating": 8.9},
+    {"id": 5, "title": "Forrest Gump", "genre": "Drama", "year": 1994, "rating": 8.8},
+    {"id": 6, "title": "Inception", "genre": "Sci-Fi", "year": 2010, "rating": 8.8},
+    {"id": 7, "title": "The Matrix", "genre": "Sci-Fi", "year": 1999, "rating": 8.7},
+]
 
-class BookSortField(str, Enum):
-    ID = "id"
-    TITLE = "title"
-    YEAR = "year"
-    AUTHOR = "author"
-
-
-class SortOrder(str, Enum):
-    ASC = "asc"
-    DESC = "desc"
-
-
-class Book(BaseModel):
-    id: int | None = None
-    title: str = Field(..., min_length=3)
-    author: str
-    year: int = Field(..., ge=1500, le=datetime.now().year)
-    is_available: bool = True
-
-
-class BookUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=3)
-    author: Optional[str] = None
-    year: Optional[int] = Field(None, ge=1500, le=datetime.now().year)
-    is_available: Optional[bool] = None
+current_id = len(db_movies) + 1
 
 
-class BookStats(BaseModel):
-    total_books: int
-    available_books: int
-    books_per_author: dict
+class MovieBase(BaseModel):
+    title: str = Field(..., min_length=2, description="The title of the movie.")
+    genre: str = Field("Unknown", description="The genre of the movie (defaults to 'Unknown').")
+    year: int = Field(..., gt=1888, description="The release year (must be after 1888).")
+    rating: float = Field(..., ge=0.0, le=10.0, description="The rating from 0.0 to 10.0.")
 
 
-books: List[Book] = []
-book_id_counter: int = 0
+class MovieCreate(MovieBase):
+    pass
 
 
-async def get_book_or_404(book_id: int) -> Book:
-    for book in books:
-        if book.id == book_id:
-            return book
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+class Movie(MovieBase):
+    id: int
 
 
-@app.post("/books", status_code=status.HTTP_201_CREATED, response_model=Book)
-async def create_book(book: Book):
-    global book_id_counter
-    book_id_counter += 1
-    book.id = book_id_counter
-    books.append(book)
-    return book
+class MovieUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=2)
+    genre: Optional[str] = None
+    year: Optional[int] = Field(None, gt=1888)
+    rating: Optional[float] = Field(None, ge=0.0, le=10.0)
 
 
-@app.post("/books/bulk", status_code=status.HTTP_201_CREATED, response_model=List[Book])
-async def bulk_create_books(book_list: List[Book]):
-    global book_id_counter
-    created_books = []
-    for book in book_list:
-        book_id_counter += 1
-        book.id = book_id_counter
-        created_books.append(book)
-
-    books.extend(created_books)
-    return created_books
+class BulkDeleteRequest(BaseModel):
+    movie_ids: List[int]
 
 
-@app.delete("/books/bulk")
-async def bulk_delete_books(book_ids: List[int] = Body(...)):
-    global books
-    ids_to_delete = set(book_ids)
-
-    deleted_books = [book for book in books if book.id in ids_to_delete]
-    books_to_keep = [book for book in books if book.id not in ids_to_delete]
-
-    deleted_count = len(books) - len(books_to_keep)
-    books = books_to_keep
-
-    return {"deleted_count": deleted_count, "deleted_books": deleted_books}
+def find_movie_by_id(movie_id: int) -> Optional[Dict]:
+    for movie in db_movies:
+        if movie["id"] == movie_id:
+            return movie
+    return None
 
 
-@app.get("/books", response_model=List[Book])
-async def get_books(
-        author: str | None = None,
-        is_available: bool | None = None,
-        min_year: int | None = None,
-        max_year: int | None = None,
-        skip: int = Query(0, ge=0),
-        limit: int = Query(10, ge=1, le=100),
-        sort_by: BookSortField = Query(BookSortField.ID),
-        order: SortOrder = Query(SortOrder.ASC)
+@app.post("/movies/", response_model=Movie, status_code=201, tags=["CRUD Operations"])
+def add_new_movie(movie: MovieCreate):
+    global current_id
+    new_movie_data = movie.model_dump()
+    new_movie_data["id"] = current_id
+    db_movies.append(new_movie_data)
+    current_id += 1
+    return new_movie_data
+
+
+@app.get("/movies/", response_model=List[Movie], tags=["CRUD Operations", "Querying"])
+def list_all_movies(
+        genre: Optional[str] = Query(None, description="Filter by genre"),
+        min_rating: Optional[float] = Query(None, ge=0.0, le=10.0, description="Filter by minimum rating"),
+        from_year: Optional[int] = Query(None, gt=1888, description="Filter from a specific year"),
+        to_year: Optional[int] = Query(None, gt=1888, description="Filter up to a specific year"),
+        sort_by: Optional[str] = Query(None, enum=["title", "year", "rating"], description="Sort by field"),
+        sort_order: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort order"),
+        skip: int = Query(0, ge=0, description="Records to skip for pagination"),
+        limit: int = Query(10, ge=1, description="Max records to return")
 ):
-    filtered_books = books.copy()
+    movies_to_return = db_movies.copy()
 
-    if author:
-        filtered_books = [b for b in filtered_books if author.lower() in b.author.lower()]
-    if is_available is not None:
-        filtered_books = [b for b in filtered_books if b.is_available == is_available]
-    if min_year:
-        filtered_books = [b for b in filtered_books if b.year >= min_year]
-    if max_year:
-        filtered_books = [b for b in filtered_books if b.year <= max_year]
+    if genre:
+        movies_to_return = [m for m in movies_to_return if m["genre"].lower() == genre.lower()]
+    if min_rating is not None:
+        movies_to_return = [m for m in movies_to_return if m["rating"] >= min_rating]
+    if from_year:
+        movies_to_return = [m for m in movies_to_return if m["year"] >= from_year]
+    if to_year:
+        movies_to_return = [m for m in movies_to_return if m["year"] <= to_year]
 
-    reverse = order == SortOrder.DESC
-    filtered_books.sort(key=lambda book: getattr(book, sort_by.value), reverse=reverse)
+    if sort_by:
+        movies_to_return.sort(key=lambda x: x[sort_by], reverse=(sort_order == "desc"))
 
-    return filtered_books[skip:skip + limit]
-
-
-@app.get("/books/search", response_model=List[Book])
-async def search_books(q: str):
-    return [
-        book for book in books
-        if q.lower() in book.title.lower() or q.lower() in book.author.lower()
-    ]
+    return movies_to_return[skip: skip + limit]
 
 
-@app.get("/books/stats", response_model=BookStats)
-async def get_book_stats():
-    total_books = len(books)
-    available_books = len([book for book in books if book.is_available])
-    books_per_author = {}
-    for book in books:
-        books_per_author[book.author] = books_per_author.get(book.author, 0) + 1
-    return BookStats(
-        total_books=total_books,
-        available_books=available_books,
-        books_per_author=books_per_author
-    )
+@app.get("/movies/{movie_id}", response_model=Movie, tags=["CRUD Operations"])
+def get_movie_by_id(movie_id: int = Path(..., description="The ID of the movie to get.", gt=0)):
+    movie = find_movie_by_id(movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
+    return movie
 
 
-@app.get("/books/{book_id}", response_model=Book)
-async def get_book_by_id(book: Book = Depends(get_book_or_404)):
-    return book
+@app.put("/movies/{movie_id}", response_model=Movie, tags=["CRUD Operations"])
+def update_a_movie(movie_id: int, movie_update: MovieUpdate):
+    movie = find_movie_by_id(movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
 
-
-@app.put("/books/{book_id}", response_model=Book)
-async def update_book(book_id: int, book_update: Book, book: Book = Depends(get_book_or_404)):
-    book_index = books.index(book)
-    book_update.id = book_id
-    books[book_index] = book_update
-    return book_update
-
-
-@app.patch("/books/{book_id}", response_model=Book)
-async def partial_update_book(book_update: BookUpdate, book: Book = Depends(get_book_or_404)):
-    update_data = book_update.model_dump(exclude_unset=True)
+    update_data = movie_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(book, key, value)
-    return book
+        movie[key] = value
+
+    return movie
 
 
-@app.delete("/books/{book_id}", response_model=Book)
-async def delete_book(book: Book = Depends(get_book_or_404)):
-    books.remove(book)
-    return book
+@app.delete("/movies/{movie_id}", status_code=204, tags=["CRUD Operations"])
+def delete_a_movie(movie_id: int):
+    movie = find_movie_by_id(movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
+    db_movies.remove(movie)
+    return
+
+
+@app.post("/movies/bulk/", response_model=List[Movie], status_code=201, tags=["Bulk Operations"])
+def add_multiple_movies(movies: List[MovieCreate]):
+    global current_id
+    newly_added = []
+    for movie_data in movies:
+        new_movie = movie_data.model_dump()
+        new_movie["id"] = current_id
+        db_movies.append(new_movie)
+        newly_added.append(new_movie)
+        current_id += 1
+    return newly_added
+
+
+@app.delete("/movies/bulk/", status_code=200, tags=["Bulk Operations"])
+def delete_multiple_movies(delete_request: BulkDeleteRequest):
+    global db_movies
+    ids_to_delete = set(delete_request.movie_ids)
+    original_count = len(db_movies)
+
+    db_movies = [movie for movie in db_movies if movie["id"] not in ids_to_delete]
+
+    deleted_count = original_count - len(db_movies)
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="None of the provided movie IDs were found.")
+
+    return {"status": "success", "deleted_count": deleted_count, "ids_deleted": sorted(list(ids_to_delete))}
+
+
+@app.get("/movies/search/", response_model=List[Movie], tags=["Advanced Features"])
+def search_movies(q: str = Query(..., min_length=1, description="Search keyword for title or genre")):
+    search_term = q.lower()
+    results = [
+        movie for movie in db_movies
+        if search_term in movie["title"].lower() or search_term in movie["genre"].lower()
+    ]
+    return results
+
+
+@app.get("/movies/stats/", response_model=Dict[str, Any], tags=["Advanced Features"])
+def get_movie_stats():
+    if not db_movies:
+        return {
+            "total_movies": 0,
+            "average_rating": 0.0,
+            "movies_per_genre": {},
+            "newest_movie": None,
+            "oldest_movie": None
+        }
+
+    total_movies = len(db_movies)
+    average_rating = round(sum(m["rating"] for m in db_movies) / total_movies, 2)
+    genres = [m["genre"] for m in db_movies]
+    movies_per_genre = Counter(genres)
+    newest_movie = max(db_movies, key=lambda x: x["year"])
+    oldest_movie = min(db_movies, key=lambda x: x["year"])
+
+    return {
+        "total_movies": total_movies,
+        "average_rating": average_rating,
+        "movies_per_genre": movies_per_genre,
+        "newest_movie": newest_movie,
+        "oldest_movie": oldest_movie
+    }
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
