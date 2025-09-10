@@ -1,38 +1,103 @@
-from fastapi import FastAPI, HTTPException, Query, Body, Path
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from collections import Counter
 import uvicorn
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import timedelta, datetime
 
-app = FastAPI()
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
-db_movies = [
-    {"id": 1, "title": "The Shawshank Redemption", "genre": "Drama", "year": 1994, "rating": 9.3},
-    {"id": 2, "title": "The Godfather", "genre": "Crime", "year": 1972, "rating": 9.2},
-    {"id": 3, "title": "The Dark Knight", "genre": "Action", "year": 2008, "rating": 9.0},
-    {"id": 4, "title": "Pulp Fiction", "genre": "Crime", "year": 1994, "rating": 8.9},
-    {"id": 5, "title": "Forrest Gump", "genre": "Drama", "year": 1994, "rating": 8.8},
-    {"id": 6, "title": "Inception", "genre": "Sci-Fi", "year": 2010, "rating": 8.8},
-    {"id": 7, "title": "The Matrix", "genre": "Sci-Fi", "year": 1999, "rating": 8.7},
-]
+app = FastAPI(title="Movie API")
 
-current_id = len(db_movies) + 1
+SECRET_KEY = "your-super-secret-key-that-is-very-long"
+ALGORITHM = "HS256"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class User(BaseModel):
+    username: str
+
+class UserInDB(User):
+    hashed_password: str
+
+fake_users_db = {
+    "testuser": {
+        "username": "testuser",
+        "hashed_password": get_password_hash("testpassword")
+    }
+}
+
+def get_user(db, username: str) -> Optional[UserInDB]:
+    if username in db:
+        user_dict = db[username]
+        return UserInDB(**user_dict)
+    return None
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = get_user(fake_users_db, username=username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.post("/token", response_model=Token, summary="User Login")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = get_user(fake_users_db, form_data.username)
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 class MovieBase(BaseModel):
-    title: str = Field(..., min_length=2, description="The title of the movie.")
-    genre: str = Field("Unknown", description="The genre of the movie (defaults to 'Unknown').")
-    year: int = Field(..., gt=1888, description="The release year (must be after 1888).")
-    rating: float = Field(..., ge=0.0, le=10.0, description="The rating from 0.0 to 10.0.")
-
+    title: str = Field(..., min_length=2)
+    genre: str = Field("Unknown")
+    year: int = Field(..., gt=1888)
+    rating: float = Field(..., ge=0.0, le=10.0)
 
 class MovieCreate(MovieBase):
     pass
 
-
 class Movie(MovieBase):
     id: int
-
 
 class MovieUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=2)
@@ -40,150 +105,60 @@ class MovieUpdate(BaseModel):
     year: Optional[int] = Field(None, gt=1888)
     rating: Optional[float] = Field(None, ge=0.0, le=10.0)
 
+db_movies = [
+    Movie(id=1, title="The Shawshank Redemption", genre="Drama", year=1994, rating=9.3),
+    Movie(id=2, title="The Godfather", genre="Crime", year=1972, rating=9.2),
+    Movie(id=3, title="The Dark Knight", genre="Action", year=2008, rating=9.0),
+]
+movie_counter = len(db_movies) + 1
 
-class BulkDeleteRequest(BaseModel):
-    movie_ids: List[int]
+@app.post("/movies/", response_model=Movie, summary="Create a Movie")
+async def create_movie(movie: MovieCreate, current_user: User = Depends(get_current_user)):
+    global movie_counter
+    new_movie = Movie(
+        id=movie_counter,
+        title=movie.title,
+        genre=movie.genre,
+        year=movie.year,
+        rating=movie.rating
+    )
+    db_movies.append(new_movie)
+    movie_counter += 1
+    return new_movie
 
+@app.get("/movies/", response_model=List[Movie], summary="Get All Movies")
+async def get_movies():
+    return db_movies
 
-def find_movie_by_id(movie_id: int) -> Optional[Dict]:
+@app.get("/movies/{movie_id}", response_model=Movie, summary="Get Movie by ID")
+async def get_movie(movie_id: int, current_user: User = Depends(get_current_user)):
     for movie in db_movies:
-        if movie["id"] == movie_id:
+        if movie.id == movie_id:
             return movie
-    return None
+    raise HTTPException(status_code=404, detail="Movie not found")
 
+@app.put("/movies/{movie_id}", response_model=Movie, summary="Update a Movie")
+async def update_movie(movie_id: int, movie_data: MovieUpdate, current_user: User = Depends(get_current_user)):
+    for movie in db_movies:
+        if movie.id == movie_id:
+            if movie_data.title is not None:
+                movie.title = movie_data.title
+            if movie_data.genre is not None:
+                movie.genre = movie_data.genre
+            if movie_data.year is not None:
+                movie.year = movie_data.year
+            if movie_data.rating is not None:
+                movie.rating = movie_data.rating
+            return movie
+    raise HTTPException(status_code=44, detail="Movie not found")
 
-@app.post("/movies/", response_model=Movie, status_code=201, tags=["CRUD Operations"])
-def add_new_movie(movie: MovieCreate):
-    global current_id
-    new_movie_data = movie.model_dump()
-    new_movie_data["id"] = current_id
-    db_movies.append(new_movie_data)
-    current_id += 1
-    return new_movie_data
-
-
-@app.get("/movies/", response_model=List[Movie], tags=["CRUD Operations", "Querying"])
-def list_all_movies(
-        genre: Optional[str] = Query(None, description="Filter by genre"),
-        min_rating: Optional[float] = Query(None, ge=0.0, le=10.0, description="Filter by minimum rating"),
-        from_year: Optional[int] = Query(None, gt=1888, description="Filter from a specific year"),
-        to_year: Optional[int] = Query(None, gt=1888, description="Filter up to a specific year"),
-        sort_by: Optional[str] = Query(None, enum=["title", "year", "rating"], description="Sort by field"),
-        sort_order: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort order"),
-        skip: int = Query(0, ge=0, description="Records to skip for pagination"),
-        limit: int = Query(10, ge=1, description="Max records to return")
-):
-    movies_to_return = db_movies.copy()
-
-    if genre:
-        movies_to_return = [m for m in movies_to_return if m["genre"].lower() == genre.lower()]
-    if min_rating is not None:
-        movies_to_return = [m for m in movies_to_return if m["rating"] >= min_rating]
-    if from_year:
-        movies_to_return = [m for m in movies_to_return if m["year"] >= from_year]
-    if to_year:
-        movies_to_return = [m for m in movies_to_return if m["year"] <= to_year]
-
-    if sort_by:
-        movies_to_return.sort(key=lambda x: x[sort_by], reverse=(sort_order == "desc"))
-
-    return movies_to_return[skip: skip + limit]
-
-
-@app.get("/movies/{movie_id}", response_model=Movie, tags=["CRUD Operations"])
-def get_movie_by_id(movie_id: int = Path(..., description="The ID of the movie to get.", gt=0)):
-    movie = find_movie_by_id(movie_id)
-    if not movie:
-        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
-    return movie
-
-
-@app.put("/movies/{movie_id}", response_model=Movie, tags=["CRUD Operations"])
-def update_a_movie(movie_id: int, movie_update: MovieUpdate):
-    movie = find_movie_by_id(movie_id)
-    if not movie:
-        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
-
-    update_data = movie_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        movie[key] = value
-
-    return movie
-
-
-@app.delete("/movies/{movie_id}", status_code=204, tags=["CRUD Operations"])
-def delete_a_movie(movie_id: int):
-    movie = find_movie_by_id(movie_id)
-    if not movie:
-        raise HTTPException(status_code=404, detail=f"Movie with ID {movie_id} not found.")
-    db_movies.remove(movie)
-    return
-
-
-@app.post("/movies/bulk/", response_model=List[Movie], status_code=201, tags=["Bulk Operations"])
-def add_multiple_movies(movies: List[MovieCreate]):
-    global current_id
-    newly_added = []
-    for movie_data in movies:
-        new_movie = movie_data.model_dump()
-        new_movie["id"] = current_id
-        db_movies.append(new_movie)
-        newly_added.append(new_movie)
-        current_id += 1
-    return newly_added
-
-
-@app.delete("/movies/bulk/", status_code=200, tags=["Bulk Operations"])
-def delete_multiple_movies(delete_request: BulkDeleteRequest):
-    global db_movies
-    ids_to_delete = set(delete_request.movie_ids)
-    original_count = len(db_movies)
-
-    db_movies = [movie for movie in db_movies if movie["id"] not in ids_to_delete]
-
-    deleted_count = original_count - len(db_movies)
-    if deleted_count == 0:
-        raise HTTPException(status_code=404, detail="None of the provided movie IDs were found.")
-
-    return {"status": "success", "deleted_count": deleted_count, "ids_deleted": sorted(list(ids_to_delete))}
-
-
-@app.get("/movies/search/", response_model=List[Movie], tags=["Advanced Features"])
-def search_movies(q: str = Query(..., min_length=1, description="Search keyword for title or genre")):
-    search_term = q.lower()
-    results = [
-        movie for movie in db_movies
-        if search_term in movie["title"].lower() or search_term in movie["genre"].lower()
-    ]
-    return results
-
-
-@app.get("/movies/stats/", response_model=Dict[str, Any], tags=["Advanced Features"])
-def get_movie_stats():
-    if not db_movies:
-        return {
-            "total_movies": 0,
-            "average_rating": 0.0,
-            "movies_per_genre": {},
-            "newest_movie": None,
-            "oldest_movie": None
-        }
-
-    total_movies = len(db_movies)
-    average_rating = round(sum(m["rating"] for m in db_movies) / total_movies, 2)
-    genres = [m["genre"] for m in db_movies]
-    movies_per_genre = Counter(genres)
-    newest_movie = max(db_movies, key=lambda x: x["year"])
-    oldest_movie = min(db_movies, key=lambda x: x["year"])
-
-    return {
-        "total_movies": total_movies,
-        "average_rating": average_rating,
-        "movies_per_genre": movies_per_genre,
-        "newest_movie": newest_movie,
-        "oldest_movie": oldest_movie
-    }
-
+@app.delete("/movies/{movie_id}", summary="Delete a Movie")
+async def delete_movie(movie_id: int, current_user: User = Depends(get_current_user)):
+    for movie in db_movies:
+        if movie.id == movie_id:
+            db_movies.remove(movie)
+            return {"message": "Movie deleted"}
+    raise HTTPException(status_code=404, detail="Movie not found")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
