@@ -1,25 +1,6 @@
 import os
 from student import Student
 
-
-def add_grade(self, grade):
-    if isinstance(grade, int):
-        self.grades.append(grade)
-    else:
-        print("Error: Grade must be an integer.")
-
-
-def calculate_average(self):
-    if not self.grades:
-        return 0.0
-    return sum(self.grades) / len(self.grades)
-
-
-def __str__(self):
-    return (f"ID: {self.student_id}, Name: {self.name}, "
-            f"Average Grade: {self.calculate_average():.2f}")
-
-
 def save_students(students, filename="students.txt"):
     try:
         with open(filename, 'w') as file:
@@ -29,7 +10,6 @@ def save_students(students, filename="students.txt"):
         print("Student data saved successfully.")
     except IOError as e:
         print(f"Error saving file: {e}")
-
 
 def load_students(filename="students.txt"):
     students = []
@@ -52,13 +32,11 @@ def load_students(filename="students.txt"):
         print(f"Error loading file: {e}")
     return students
 
-
 def find_student_by_id(students, student_id):
     for student in students:
         if student.student_id == student_id:
             return student
     return None
-
 
 def main():
     filename = "students.txt"
@@ -123,7 +101,6 @@ def main():
 
         else:
             print("Invalid choice. Please enter a number between 1 and 5.")
-
 
 if __name__ == "__main__":
     main()
