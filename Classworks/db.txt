@@ -1,0 +1,10 @@
+J.R.R. Tolkien,The Hobbit,310
+J.R.R. Tolkien,The Fellowship of the Ring,423
+George Orwell,1984,328
+Isaac Asimov,Foundation,255
+Jane Austen,Pride and Prejudice,279
+Harper Lee,To Kill a Mockingbird,281
+F. Scott Fitzgerald,The Great Gatsby,180
+Herman Melville,Moby Dick,635
+Aldous Huxley,Brave New World,311
+Nicolo Machiavelli,The Prince,144

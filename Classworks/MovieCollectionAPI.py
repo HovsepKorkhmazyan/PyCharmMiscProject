@@ -10,7 +10,7 @@ from passlib.context import CryptContext
 
 app = FastAPI(title="Movie API")
 
-SECRET_KEY = ""
+SECRET_KEY = "IB1Rrrup6F"
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
