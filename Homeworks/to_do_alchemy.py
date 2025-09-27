@@ -148,7 +148,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
-app = FastAPI()
+app = FastAPI(title= "To DO With Alchemy", version="1.0")
 
 
 @app.post("/token", response_model=Token)
