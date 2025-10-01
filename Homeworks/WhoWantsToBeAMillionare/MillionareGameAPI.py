@@ -66,7 +66,7 @@ class PlayerScore(BaseModel):
         orm_mode = True
 
 app = FastAPI(
-    title="Who want to be a millionare",
+    title="Who Wants To Be A Millionare",
     description="An API for a simple quiz game using FastAPI and SQLite.",
     version="1.0.0"
 )
