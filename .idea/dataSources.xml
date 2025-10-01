@@ -15,5 +15,12 @@
       <jdbc-url>jdbc:sqlite:C:\Users\Acer\PyCharmMiscProject\Classworks\cities.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="questions" uuid="8055bb62-06ac-4403-8ebf-7843a3495585">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:C:\Users\Acer\PyCharmMiscProject\Homeworks\questions.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>
